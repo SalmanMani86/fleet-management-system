@@ -1,0 +1,384 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenant root
+// ---------------------------------------------------------------------------
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  vehicleModels       VehicleModel[]
+  vehicles            Vehicle[]
+  drivers             Driver[]
+  trailers            Trailer[]
+  vehicleAssignments  VehicleAssignment[]
+  trailerAssignments  TrailerAssignment[]
+  vehicleDocuments    VehicleDocument[]
+  maintenanceRecords  MaintenanceRecord[]
+  fuelRecords         FuelRecord[]
+  customers           Customer[]
+  trips               Trip[]
+  auditLogs           AuditLog[]
+
+  @@map("companies")
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle Models
+// ---------------------------------------------------------------------------
+
+model VehicleModel {
+  id           String   @id @default(uuid())
+  companyId    String   @map("company_id")
+  make         String
+  modelName    String   @map("model_name")
+  manufactureYear Int   @map("manufacture_year")
+  capacityKg   Decimal? @map("capacity_kg") @db.Decimal(10, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicles Vehicle[]
+
+  @@index([companyId])
+  @@map("vehicle_models")
+}
+
+// ---------------------------------------------------------------------------
+// Drivers
+// ---------------------------------------------------------------------------
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Driver {
+  id             String       @id @default(uuid())
+  companyId      String       @map("company_id")
+  fullName       String       @map("full_name")
+  licenseNumber  String       @map("license_number")
+  licenseExpiry  DateTime?    @map("license_expiry") @db.Date
+  phone          String?
+  status         DriverStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  company             Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicleAssignments  VehicleAssignment[]
+  trips               Trip[]
+  fuelRecords         FuelRecord[]
+
+  @@unique([companyId, licenseNumber])
+  @@index([companyId, status])
+  @@map("drivers")
+}
+
+// ---------------------------------------------------------------------------
+// Trailers
+// ---------------------------------------------------------------------------
+
+enum TrailerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Trailer {
+  id           String        @id @default(uuid())
+  companyId    String        @map("company_id")
+  plateNumber  String        @map("plate_number")
+  trailerType  String?       @map("trailer_type")
+  capacityKg   Decimal?      @map("capacity_kg") @db.Decimal(10, 2)
+  status       TrailerStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  company            Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  trailerAssignments TrailerAssignment[]
+  trips              Trip[]
+
+  @@unique([companyId, plateNumber])
+  @@index([companyId, status])
+  @@map("trailers")
+}
+
+// ---------------------------------------------------------------------------
+// Vehicles — the profile aggregation root
+// ---------------------------------------------------------------------------
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+model Vehicle {
+  id              String        @id @default(uuid())
+  companyId       String        @map("company_id")
+  vehicleModelId  String        @map("vehicle_model_id")
+  vin             String
+  plateNumber     String        @map("plate_number")
+  manufactureYear Int           @map("manufacture_year")
+  status          VehicleStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  company            Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicleModel       VehicleModel         @relation(fields: [vehicleModelId], references: [id], onDelete: Restrict)
+  vehicleAssignments VehicleAssignment[]
+  trailerAssignments TrailerAssignment[]
+  vehicleDocuments   VehicleDocument[]
+  maintenanceRecords MaintenanceRecord[]
+  fuelRecords        FuelRecord[]
+  trips              Trip[]
+
+  @@unique([companyId, vin])
+  @@unique([companyId, plateNumber])
+  @@index([companyId, status])
+  @@map("vehicles")
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle Assignment (driver <-> vehicle) — time-bounded, append-only history.
+// This is the single source of truth for "current driver": the row for a
+// vehicle with effectiveTo = null. Never a mutable currentDriverId column.
+// ---------------------------------------------------------------------------
+
+model VehicleAssignment {
+  id            String    @id @default(uuid())
+  companyId     String    @map("company_id")
+  vehicleId     String    @map("vehicle_id")
+  driverId      String    @map("driver_id")
+  effectiveFrom DateTime  @default(now()) @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  // At most one open (effectiveTo IS NULL) assignment per vehicle is enforced
+  // in the service layer via a row lock + check inside a transaction, since
+  // Postgres partial unique indexes aren't expressible directly in the
+  // Prisma schema DSL — see the migration's partial unique index below.
+  @@index([companyId, vehicleId, effectiveTo])
+  @@index([companyId, driverId, effectiveTo])
+  @@map("vehicle_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// Trailer Assignment (trailer <-> vehicle) — same time-bounded pattern.
+// ---------------------------------------------------------------------------
+
+model TrailerAssignment {
+  id            String    @id @default(uuid())
+  companyId     String    @map("company_id")
+  vehicleId     String    @map("vehicle_id")
+  trailerId     String    @map("trailer_id")
+  effectiveFrom DateTime  @default(now()) @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  trailer Trailer @relation(fields: [trailerId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, vehicleId, effectiveTo])
+  @@index([companyId, trailerId, effectiveTo])
+  @@map("trailer_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle Documents — expiry tracking / alerts
+// ---------------------------------------------------------------------------
+
+enum DocumentType {
+  REGISTRATION
+  INSURANCE
+  INSPECTION
+  PERMIT
+  OTHER
+}
+
+model VehicleDocument {
+  id            String       @id @default(uuid())
+  companyId     String       @map("company_id")
+  vehicleId     String       @map("vehicle_id")
+  documentType  DocumentType @map("document_type")
+  documentNumber String?     @map("document_number")
+  issuedDate    DateTime?    @map("issued_date") @db.Date
+  expiryDate    DateTime     @map("expiry_date") @db.Date
+  fileUrl       String?      @map("file_url")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, vehicleId])
+  @@index([companyId, expiryDate])
+  @@map("vehicle_documents")
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance — schedules, history, auditable status changes
+// ---------------------------------------------------------------------------
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model MaintenanceRecord {
+  id             String            @id @default(uuid())
+  companyId      String            @map("company_id")
+  vehicleId      String            @map("vehicle_id")
+  description    String
+  scheduledDate  DateTime?         @map("scheduled_date") @db.Date
+  completedDate  DateTime?         @map("completed_date") @db.Date
+  odometerKm     Int?              @map("odometer_km")
+  cost           Decimal?          @db.Decimal(12, 2)
+  status         MaintenanceStatus @default(SCHEDULED)
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  company    Company                  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicle    Vehicle                  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  statusLogs MaintenanceStatusLog[]
+
+  @@index([companyId, vehicleId])
+  @@index([companyId, status])
+  @@map("maintenance_records")
+}
+
+// Append-only audit trail of every status transition a maintenance record
+// goes through. Required explicitly by the assessment brief ("Maintain an
+// auditable history of maintenance status changes").
+model MaintenanceStatusLog {
+  id                  String            @id @default(uuid())
+  companyId           String            @map("company_id")
+  maintenanceRecordId String            @map("maintenance_record_id")
+  fromStatus          MaintenanceStatus? @map("from_status")
+  toStatus            MaintenanceStatus @map("to_status")
+  note                String?
+  createdAt           DateTime          @default(now()) @map("created_at")
+
+  maintenanceRecord MaintenanceRecord @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, maintenanceRecordId])
+  @@map("maintenance_status_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Fuel Records
+// ---------------------------------------------------------------------------
+
+model FuelRecord {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  vehicleId   String   @map("vehicle_id")
+  driverId    String   @map("driver_id")
+  tripId      String?  @map("trip_id")
+  filledAt    DateTime @map("filled_at")
+  liters      Decimal  @db.Decimal(10, 2)
+  costPerLiter Decimal @map("cost_per_liter") @db.Decimal(10, 2)
+  totalCost   Decimal  @map("total_cost") @db.Decimal(12, 2)
+  odometerKm  Int?     @map("odometer_km")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  trip    Trip?   @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, vehicleId])
+  @@index([companyId, tripId])
+  @@map("fuel_records")
+}
+
+// ---------------------------------------------------------------------------
+// Customers — minimal, Trip needs a counterparty; contract terms out of scope
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  name      String
+  contactInfo String? @map("contact_info")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  trips   Trip[]
+
+  @@index([companyId])
+  @@map("customers")
+}
+
+// ---------------------------------------------------------------------------
+// Trips — driver/vehicle/trailer are snapshotted at creation time and never
+// re-derived from current assignment state, so a later reassignment cannot
+// rewrite a completed trip's historical relationships.
+// ---------------------------------------------------------------------------
+
+enum TripStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Trip {
+  id              String     @id @default(uuid())
+  companyId       String     @map("company_id")
+  vehicleId       String     @map("vehicle_id")
+  driverId        String     @map("driver_id")
+  trailerId       String?    @map("trailer_id")
+  customerId      String     @map("customer_id")
+  loadingPoint    String?    @map("loading_point")
+  deliveryPoint   String?    @map("delivery_point")
+  scheduledAt     DateTime?  @map("scheduled_at")
+  completedAt     DateTime?  @map("completed_at")
+  amount          Decimal?   @db.Decimal(12, 2)
+  status          TripStatus @default(PLANNED)
+  idempotencyKey  String?    @map("idempotency_key")
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  company  Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  vehicle  Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver   Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  trailer  Trailer?     @relation(fields: [trailerId], references: [id], onDelete: SetNull)
+  customer Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  fuelRecords FuelRecord[]
+
+  @@unique([companyId, idempotencyKey])
+  @@index([companyId, vehicleId])
+  @@index([companyId, driverId])
+  @@index([companyId, status])
+  @@map("trips")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log — append-only, mirrors the ERP project's pattern
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  companyId   String?  @map("company_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  beforeState Json?    @map("before_state")
+  afterState  Json?    @map("after_state")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
