@@ -91,6 +91,7 @@ describe("integration: assessment brief scenario — vehicle assigned to Driver 
       deliveryPoint: "Jeddah",
     });
     await expect(setTripAmount(companyId, trip.id, 0)).rejects.toThrow(/greater than zero/);
+    await transitionTripStatus(companyId, trip.id, "CANCELLED");
   });
 
   it("rejects completing a trip that has no positive amount set", async () => {
@@ -102,6 +103,23 @@ describe("integration: assessment brief scenario — vehicle assigned to Driver 
     });
     await transitionTripStatus(companyId, trip.id, "IN_PROGRESS");
     await expect(transitionTripStatus(companyId, trip.id, "COMPLETED")).rejects.toThrow(/positive amount/);
+    await transitionTripStatus(companyId, trip.id, "CANCELLED");
+  });
+
+  it("rejects creating a second open trip on a vehicle that already has one in flight", async () => {
+    const first = await createTrip(companyId, {
+      vehicleId,
+      customerId,
+      loadingPoint: "Riyadh",
+      deliveryPoint: "Jeddah",
+      amount: 100,
+    });
+
+    await expect(
+      createTrip(companyId, { vehicleId, customerId, loadingPoint: "Riyadh", deliveryPoint: "Jeddah", amount: 50 })
+    ).rejects.toThrow(/already has an open trip/);
+
+    await transitionTripStatus(companyId, first.id, "CANCELLED");
   });
 
   it("rejects trip creation for an INACTIVE vehicle", async () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "../../src/lib/prisma";
 import { createTestCompany, cleanupTestCompany } from "./testFixtures";
 import { assignDriverToVehicle } from "../../src/modules/vehicleAssignment/vehicleAssignment.service";
-import { createTrip } from "../../src/modules/trip/trip.service";
+import { createTrip, transitionTripStatus } from "../../src/modules/trip/trip.service";
 
 describe("integration: trip idempotency prevents duplicate processing", () => {
   let companyId: string;
@@ -34,6 +34,11 @@ describe("integration: trip idempotency prevents duplicate processing", () => {
       idempotencyKey: key,
     });
     expect(first.idempotencyKey).toBe(key);
+
+    // Close out the first trip so the duplicate-submission attempt below is
+    // rejected specifically for reusing the idempotency key, not merely
+    // because the vehicle already has an open trip (a separate rule).
+    await transitionTripStatus(companyId, first.id, "CANCELLED");
 
     await expect(
       createTrip(companyId, {

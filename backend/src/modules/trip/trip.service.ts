@@ -25,6 +25,10 @@ export interface CreateTripInput {
  * driver, this trip's driverId is untouched, because it was copied, not
  * referenced. The vehicle must also be ACTIVE and have an open driver
  * assignment, or trip creation is refused outright.
+ *
+ * A vehicle can have at most one open trip (PLANNED or IN_PROGRESS) at a
+ * time — a single truck cannot physically run two deliveries at once — so
+ * creation is also refused if the vehicle already has one in flight.
  */
 export async function createTrip(companyId: string, input: CreateTripInput) {
   try {
@@ -37,6 +41,15 @@ export async function createTrip(companyId: string, input: CreateTripInput) {
       });
       if (!currentDriverAssignment) {
         throw new InvalidStateError("Vehicle has no current driver assignment; assign a driver before creating a trip");
+      }
+
+      const openTrip = await tx.trip.findFirst({
+        where: { companyId, vehicleId: vehicle.id, status: { in: ["PLANNED", "IN_PROGRESS"] } },
+      });
+      if (openTrip) {
+        throw new InvalidStateError(
+          `Vehicle already has an open trip (${openTrip.status}); complete or cancel it before creating a new one`
+        );
       }
 
       const currentTrailerAssignment = await tx.trailerAssignment.findFirst({
