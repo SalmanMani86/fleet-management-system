@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { customersApi } from "../../api/customers";
+import { useSubmit } from "../../lib/useSubmit";
+import { customersApi, type CreateCustomerInput } from "../../api/customers";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input } from "../../components/Field";
 
 export function CustomersPage() {
@@ -73,42 +74,32 @@ function CreateCustomerModal({
 }) {
   const [name, setName] = useState("");
   const [contactInfo, setContactInfo] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateCustomerInput) => customersApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await customersApi.create(companyId, { name, contactInfo: contactInfo || undefined });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create customer");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ name, contactInfo: contactInfo || undefined }, "Failed to create customer");
   }
 
   return (
-    <Modal title="New customer" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Name">
-          <Input required value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label="Contact info (optional)">
-          <Input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Create customer
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal
+      title="New customer"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create customer"
+    >
+      <Field label="Name">
+        <Input required value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Contact info (optional)">
+        <Input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} />
+      </Field>
+    </FormModal>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { fuelApi } from "../../api/fuel";
+import { useSubmit } from "../../lib/useSubmit";
+import { fuelApi, type CreateFuelRecordInput } from "../../api/fuel";
 import { vehiclesApi } from "../../api/vehicles";
 import { driversApi } from "../../api/drivers";
 import { tripsApi } from "../../api/trips";
@@ -9,7 +10,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input, Select } from "../../components/Field";
 import { formatDateTime, formatMoney } from "../../lib/format";
 import type { Driver, Trip, Vehicle } from "../../types";

@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { trailersApi } from "../../api/trailers";
+import { useSubmit } from "../../lib/useSubmit";
+import { trailersApi, type CreateTrailerInput } from "../../api/trailers";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
 import { StatusBadge } from "../../components/Badge";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input } from "../../components/Field";
 import type { TrailerStatus } from "../../types";
 
@@ -93,49 +94,38 @@ function CreateTrailerModal({
   const [plateNumber, setPlateNumber] = useState("");
   const [trailerType, setTrailerType] = useState("");
   const [capacityKg, setCapacityKg] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateTrailerInput) => trailersApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await trailersApi.create(companyId, {
-        plateNumber,
-        trailerType: trailerType || undefined,
-        capacityKg: capacityKg || undefined,
-      });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create trailer");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit(
+      { plateNumber, trailerType: trailerType || undefined, capacityKg: capacityKg || undefined },
+      "Failed to create trailer"
+    );
   }
 
   return (
-    <Modal title="New trailer" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Plate number">
-          <Input required value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
-        </Field>
-        <Field label="Type (optional)">
-          <Input value={trailerType} onChange={(e) => setTrailerType(e.target.value)} placeholder="e.g. Flatbed" />
-        </Field>
-        <Field label="Capacity (kg, optional)">
-          <Input type="number" value={capacityKg} onChange={(e) => setCapacityKg(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Create trailer
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal
+      title="New trailer"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create trailer"
+    >
+      <Field label="Plate number">
+        <Input required value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
+      </Field>
+      <Field label="Type (optional)">
+        <Input value={trailerType} onChange={(e) => setTrailerType(e.target.value)} placeholder="e.g. Flatbed" />
+      </Field>
+      <Field label="Capacity (kg, optional)">
+        <Input type="number" value={capacityKg} onChange={(e) => setCapacityKg(e.target.value)} />
+      </Field>
+    </FormModal>
   );
 }

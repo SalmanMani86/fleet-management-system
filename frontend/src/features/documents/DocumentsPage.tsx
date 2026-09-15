@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { vehicleDocumentsApi } from "../../api/vehicleDocuments";
+import { useSubmit } from "../../lib/useSubmit";
+import { vehicleDocumentsApi, type CreateVehicleDocumentInput } from "../../api/vehicleDocuments";
 import { vehiclesApi } from "../../api/vehicles";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
 import { Badge } from "../../components/Badge";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input, Select } from "../../components/Field";
 import { formatDate, daysUntil } from "../../lib/format";
 import type { DocumentType, Vehicle } from "../../types";
@@ -103,66 +104,51 @@ function CreateDocumentModal({
   const [documentType, setDocumentType] = useState<DocumentType>("REGISTRATION");
   const [documentNumber, setDocumentNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateVehicleDocumentInput) => vehicleDocumentsApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await vehicleDocumentsApi.create(companyId, {
-        vehicleId,
-        documentType,
-        documentNumber: documentNumber || undefined,
-        expiryDate,
-      });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create document");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ vehicleId, documentType, documentNumber: documentNumber || undefined, expiryDate }, "Failed to create document");
   }
 
   return (
-    <Modal title="New vehicle document" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Vehicle">
-          <Select required value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-            <option value="">Select a vehicle…</option>
-            {vehicles?.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.plateNumber}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Document type">
-          <Select value={documentType} onChange={(e) => setDocumentType(e.target.value as DocumentType)}>
-            {DOCUMENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Document number (optional)">
-          <Input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
-        </Field>
-        <Field label="Expiry date">
-          <Input type="date" required value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Create document
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal
+      title="New vehicle document"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create document"
+    >
+      <Field label="Vehicle">
+        <Select required value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+          <option value="">Select a vehicle…</option>
+          {vehicles?.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.plateNumber}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Document type">
+        <Select value={documentType} onChange={(e) => setDocumentType(e.target.value as DocumentType)}>
+          {DOCUMENT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Document number (optional)">
+        <Input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
+      </Field>
+      <Field label="Expiry date">
+        <Input type="date" required value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+      </Field>
+    </FormModal>
   );
 }

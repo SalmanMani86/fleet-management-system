@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { driversApi } from "../../api/drivers";
+import { useSubmit } from "../../lib/useSubmit";
+import { driversApi, type CreateDriverInput } from "../../api/drivers";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
 import { StatusBadge } from "../../components/Badge";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input } from "../../components/Field";
 import { formatDate } from "../../lib/format";
 import type { DriverStatus } from "../../types";
@@ -97,53 +98,34 @@ function CreateDriverModal({
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseExpiry, setLicenseExpiry] = useState("");
   const [phone, setPhone] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateDriverInput) => driversApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await driversApi.create(companyId, {
-        fullName,
-        licenseNumber,
-        licenseExpiry: licenseExpiry || undefined,
-        phone: phone || undefined,
-      });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create driver");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit(
+      { fullName, licenseNumber, licenseExpiry: licenseExpiry || undefined, phone: phone || undefined },
+      "Failed to create driver"
+    );
   }
 
   return (
-    <Modal title="New driver" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Full name">
-          <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} />
-        </Field>
-        <Field label="License number">
-          <Input required value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
-        </Field>
-        <Field label="License expiry (optional)">
-          <Input type="date" value={licenseExpiry} onChange={(e) => setLicenseExpiry(e.target.value)} />
-        </Field>
-        <Field label="Phone (optional)">
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Create driver
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal title="New driver" onClose={onClose} onSubmit={handleSubmit} error={error} isSubmitting={isSubmitting} submitLabel="Create driver">
+      <Field label="Full name">
+        <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+      </Field>
+      <Field label="License number">
+        <Input required value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
+      </Field>
+      <Field label="License expiry (optional)">
+        <Input type="date" value={licenseExpiry} onChange={(e) => setLicenseExpiry(e.target.value)} />
+      </Field>
+      <Field label="Phone (optional)">
+        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </Field>
+    </FormModal>
   );
 }

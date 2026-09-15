@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { vehiclesApi } from "../../api/vehicles";
+import { useSubmit } from "../../lib/useSubmit";
+import { vehiclesApi, type CreateVehicleInput } from "../../api/vehicles";
 import { vehicleModelsApi } from "../../api/vehicleModels";
 import { vehicleAssignmentsApi } from "../../api/vehicleAssignments";
 import { PageHeader } from "../../components/PageHeader";
@@ -10,7 +11,7 @@ import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
 import { StatusBadge, Badge } from "../../components/Badge";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input, Select } from "../../components/Field";
 
 export function VehiclesPage() {
@@ -123,62 +124,53 @@ function CreateVehicleModal({
   const [vin, setVin] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
   const [manufactureYear, setManufactureYear] = useState(new Date().getFullYear());
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateVehicleInput) => vehiclesApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await vehiclesApi.create(companyId, { vehicleModelId, vin, plateNumber, manufactureYear });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create vehicle");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ vehicleModelId, vin, plateNumber, manufactureYear }, "Failed to create vehicle");
   }
 
   return (
-    <Modal title="New vehicle" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Vehicle model" hint={!models?.length ? "Create a vehicle model first." : undefined}>
-          <Select required value={vehicleModelId} onChange={(e) => setVehicleModelId(e.target.value)}>
-            <option value="">Select a model…</option>
-            {models?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.make} {m.modelName} ({m.manufactureYear})
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="VIN">
-          <Input required value={vin} onChange={(e) => setVin(e.target.value)} />
-        </Field>
-        <Field label="Plate number">
-          <Input required value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
-        </Field>
-        <Field label="Manufacture year">
-          <Input
-            type="number"
-            required
-            min={1950}
-            max={2100}
-            value={manufactureYear}
-            onChange={(e) => setManufactureYear(Number(e.target.value))}
-          />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting} disabled={!models?.length}>
-            Create vehicle
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal
+      title="New vehicle"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create vehicle"
+      submitDisabled={!models?.length}
+    >
+      <Field label="Vehicle model" hint={!models?.length ? "Create a vehicle model first." : undefined}>
+        <Select required value={vehicleModelId} onChange={(e) => setVehicleModelId(e.target.value)}>
+          <option value="">Select a model…</option>
+          {models?.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.make} {m.modelName} ({m.manufactureYear})
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="VIN">
+        <Input required value={vin} onChange={(e) => setVin(e.target.value)} />
+      </Field>
+      <Field label="Plate number">
+        <Input required value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
+      </Field>
+      <Field label="Manufacture year">
+        <Input
+          type="number"
+          required
+          min={1950}
+          max={2100}
+          value={manufactureYear}
+          onChange={(e) => setManufactureYear(Number(e.target.value))}
+        />
+      </Field>
+    </FormModal>
   );
 }

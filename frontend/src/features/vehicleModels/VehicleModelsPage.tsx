@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { vehicleModelsApi } from "../../api/vehicleModels";
+import { useSubmit } from "../../lib/useSubmit";
+import { vehicleModelsApi, type CreateVehicleModelInput } from "../../api/vehicleModels";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input } from "../../components/Field";
 
 export function VehicleModelsPage() {
@@ -79,60 +80,45 @@ function CreateVehicleModelModal({
   const [modelName, setModelName] = useState("");
   const [manufactureYear, setManufactureYear] = useState(new Date().getFullYear());
   const [capacityKg, setCapacityKg] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateVehicleModelInput) => vehicleModelsApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await vehicleModelsApi.create(companyId, {
-        make,
-        modelName,
-        manufactureYear,
-        capacityKg: capacityKg || undefined,
-      });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create vehicle model");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ make, modelName, manufactureYear, capacityKg: capacityKg || undefined }, "Failed to create vehicle model");
   }
 
   return (
-    <Modal title="New vehicle model" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Make">
-          <Input required value={make} onChange={(e) => setMake(e.target.value)} placeholder="e.g. Volvo" />
-        </Field>
-        <Field label="Model">
-          <Input required value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="e.g. FH16" />
-        </Field>
-        <Field label="Manufacture year">
-          <Input
-            type="number"
-            required
-            min={1950}
-            max={2100}
-            value={manufactureYear}
-            onChange={(e) => setManufactureYear(Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Capacity (kg, optional)">
-          <Input type="number" value={capacityKg} onChange={(e) => setCapacityKg(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Create model
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal
+      title="New vehicle model"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create model"
+    >
+      <Field label="Make">
+        <Input required value={make} onChange={(e) => setMake(e.target.value)} placeholder="e.g. Volvo" />
+      </Field>
+      <Field label="Model">
+        <Input required value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="e.g. FH16" />
+      </Field>
+      <Field label="Manufacture year">
+        <Input
+          type="number"
+          required
+          min={1950}
+          max={2100}
+          value={manufactureYear}
+          onChange={(e) => setManufactureYear(Number(e.target.value))}
+        />
+      </Field>
+      <Field label="Capacity (kg, optional)">
+        <Input type="number" value={capacityKg} onChange={(e) => setCapacityKg(e.target.value)} />
+      </Field>
+    </FormModal>
   );
 }

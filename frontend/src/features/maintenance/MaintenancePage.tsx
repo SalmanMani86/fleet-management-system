@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { maintenanceApi } from "../../api/maintenance";
+import { useSubmit } from "../../lib/useSubmit";
+import { maintenanceApi, type CreateMaintenanceRecordInput } from "../../api/maintenance";
 import { vehiclesApi } from "../../api/vehicles";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
 import { StatusBadge } from "../../components/Badge";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input, Select } from "../../components/Field";
 import { formatDate, formatMoney } from "../../lib/format";
 import type { MaintenanceRecord, MaintenanceStatus, Vehicle } from "../../types";
@@ -119,60 +120,48 @@ function CreateMaintenanceModal({
   const [description, setDescription] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [cost, setCost] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateMaintenanceRecordInput) => maintenanceApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await maintenanceApi.create(companyId, {
-        vehicleId,
-        description,
-        scheduledDate: scheduledDate || undefined,
-        cost: cost || undefined,
-      });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create maintenance record");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit(
+      { vehicleId, description, scheduledDate: scheduledDate || undefined, cost: cost || undefined },
+      "Failed to create maintenance record"
+    );
   }
 
   return (
-    <Modal title="New maintenance record" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Vehicle">
-          <Select required value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-            <option value="">Select a vehicle…</option>
-            {vehicles?.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.plateNumber}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Description">
-          <Input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Oil change" />
-        </Field>
-        <Field label="Scheduled date (optional)">
-          <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
-        </Field>
-        <Field label="Estimated cost (optional)">
-          <Input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Create record
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal
+      title="New maintenance record"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create record"
+    >
+      <Field label="Vehicle">
+        <Select required value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+          <option value="">Select a vehicle…</option>
+          {vehicles?.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.plateNumber}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Description">
+        <Input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Oil change" />
+      </Field>
+      <Field label="Scheduled date (optional)">
+        <Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
+      </Field>
+      <Field label="Estimated cost (optional)">
+        <Input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
+      </Field>
+    </FormModal>
   );
 }
