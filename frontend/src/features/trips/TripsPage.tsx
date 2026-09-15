@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
-import { tripsApi } from "../../api/trips";
+import { useSubmit } from "../../lib/useSubmit";
+import { tripsApi, type CreateTripInput } from "../../api/trips";
 import { vehiclesApi } from "../../api/vehicles";
 import { customersApi } from "../../api/customers";
 import { vehicleAssignmentsApi } from "../../api/vehicleAssignments";
@@ -11,7 +12,7 @@ import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
 import { StatusBadge } from "../../components/Badge";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Input, Select } from "../../components/Field";
 import { formatDateTime, formatMoney } from "../../lib/format";
 import type { Trip, TripStatus } from "../../types";
@@ -156,97 +157,82 @@ function CreateTripModal({
   const [loadingPoint, setLoadingPoint] = useState("");
   const [deliveryPoint, setDeliveryPoint] = useState("");
   const [amount, setAmount] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const { data: currentAssignment } = useApi(
     () => (vehicleId ? vehicleAssignmentsApi.getCurrent(companyId, vehicleId) : Promise.resolve(null)),
     [companyId, vehicleId]
   );
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: CreateTripInput) => tripsApi.create(companyId, input),
+    onCreated
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await tripsApi.create(companyId, {
-        vehicleId,
-        customerId,
-        loadingPoint,
-        deliveryPoint,
-        amount: amount || undefined,
-      });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create trip");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ vehicleId, customerId, loadingPoint, deliveryPoint, amount: amount || undefined }, "Failed to create trip");
   }
 
   return (
-    <Modal title="New trip" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Vehicle" hint="Only ACTIVE vehicles are selectable for trips.">
-          <Select required value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
-            <option value="">Select a vehicle…</option>
-            {vehicles?.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.plateNumber}
-              </option>
-            ))}
-          </Select>
-        </Field>
+    <FormModal
+      title="New trip"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create trip"
+      submitDisabled={!!vehicleId && !currentAssignment}
+    >
+      <Field label="Vehicle" hint="Only ACTIVE vehicles are selectable for trips.">
+        <Select required value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+          <option value="">Select a vehicle…</option>
+          {vehicles?.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.plateNumber}
+            </option>
+          ))}
+        </Select>
+      </Field>
 
-        {vehicleId && (
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            {currentAssignment ? (
-              <span className="text-slate-600">
-                Driver will be resolved automatically: <span className="font-medium text-slate-900">{currentAssignment.driver?.fullName}</span>
-              </span>
-            ) : (
-              <span className="text-rose-600">
-                This vehicle has no current driver assignment.{" "}
-                <Link to={`/vehicles/${vehicleId}`} target="_blank" rel="noopener noreferrer" className="font-medium underline">
-                  Open its profile to assign a driver
-                </Link>
-                , then come back and select it again.
-              </span>
-            )}
-          </div>
-        )}
+      {vehicleId && (
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          {currentAssignment ? (
+            <span className="text-slate-600">
+              Driver will be resolved automatically: <span className="font-medium text-slate-900">{currentAssignment.driver?.fullName}</span>
+            </span>
+          ) : (
+            <span className="text-rose-600">
+              This vehicle has no current driver assignment.{" "}
+              <Link to={`/vehicles/${vehicleId}`} target="_blank" rel="noopener noreferrer" className="font-medium underline">
+                Open its profile to assign a driver
+              </Link>
+              , then come back and select it again.
+            </span>
+          )}
+        </div>
+      )}
 
-        <Field label="Customer">
-          <Select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-            <option value="">Select a customer…</option>
-            {customers?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+      <Field label="Customer">
+        <Select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+          <option value="">Select a customer…</option>
+          {customers?.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Loading point">
+          <Input required value={loadingPoint} onChange={(e) => setLoadingPoint(e.target.value)} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Loading point">
-            <Input required value={loadingPoint} onChange={(e) => setLoadingPoint(e.target.value)} />
-          </Field>
-          <Field label="Delivery point">
-            <Input required value={deliveryPoint} onChange={(e) => setDeliveryPoint(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Amount (optional, required before completion)">
-          <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <Field label="Delivery point">
+          <Input required value={deliveryPoint} onChange={(e) => setDeliveryPoint(e.target.value)} />
         </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting} disabled={!!vehicleId && !currentAssignment}>
-            Create trip
-          </Button>
-        </div>
-      </form>
-    </Modal>
+      </div>
+      <Field label="Amount (optional, required before completion)">
+        <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </Field>
+    </FormModal>
   );
 }

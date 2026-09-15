@@ -1,8 +1,14 @@
 import { api } from "./client";
 import type { VehicleAssignment } from "../types";
 
+export interface AssignDriverInput {
+  vehicleId: string;
+  driverId: string;
+  effectiveFrom?: string;
+}
+
 export const vehicleAssignmentsApi = {
-  assign: (companyId: string, input: { vehicleId: string; driverId: string; effectiveFrom?: string }) =>
+  assign: (companyId: string, input: AssignDriverInput) =>
     api.post<VehicleAssignment>(`/companies/${companyId}/vehicle-assignments`, input),
   unassign: (companyId: string, vehicleId: string) =>
     api.post<VehicleAssignment | null>(`/companies/${companyId}/vehicle-assignments/${vehicleId}/unassign`, {}),

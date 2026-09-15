@@ -7,7 +7,7 @@ import { useState } from "react";
  * This hook is that lifecycle, so a modal only needs to describe its own
  * request — not re-implement the bookkeeping around it.
  */
-export function useSubmit<T>(action: (input: T) => Promise<unknown>, onSuccess: () => void) {
+export function useSubmit<T, R = unknown>(action: (input: T) => Promise<R>, onSuccess: (result: R) => void) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,8 +15,8 @@ export function useSubmit<T>(action: (input: T) => Promise<unknown>, onSuccess: 
     setIsSubmitting(true);
     setError(null);
     try {
-      await action(input);
-      onSuccess();
+      const result = await action(input);
+      onSuccess(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : fallbackMessage);
     } finally {

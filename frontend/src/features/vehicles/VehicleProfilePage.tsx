@@ -2,19 +2,20 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
+import { useSubmit } from "../../lib/useSubmit";
 import { vehicleProfileApi } from "../../api/vehicleProfile";
 import { vehiclesApi } from "../../api/vehicles";
 import { driversApi } from "../../api/drivers";
 import { trailersApi } from "../../api/trailers";
-import { vehicleAssignmentsApi } from "../../api/vehicleAssignments";
-import { trailerAssignmentsApi } from "../../api/trailerAssignments";
+import { vehicleAssignmentsApi, type AssignDriverInput } from "../../api/vehicleAssignments";
+import { trailerAssignmentsApi, type AssignTrailerInput } from "../../api/trailerAssignments";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardHeader, CardBody } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
 import { StatusBadge, Badge } from "../../components/Badge";
-import { Modal } from "../../components/Modal";
+import { FormModal } from "../../components/FormModal";
 import { Field, Select } from "../../components/Field";
 import { formatDate, formatDateTime, formatMoney, daysUntil } from "../../lib/format";
 import type { VehicleStatus } from "../../types";
@@ -326,47 +327,30 @@ function ReassignDriverModal({
 }) {
   const { data: drivers } = useApi(() => driversApi.list(companyId, "ACTIVE"), [companyId]);
   const [driverId, setDriverId] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: AssignDriverInput) => vehicleAssignmentsApi.assign(companyId, input),
+    onDone
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await vehicleAssignmentsApi.assign(companyId, { vehicleId, driverId });
-      onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reassign driver");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ vehicleId, driverId }, "Failed to reassign driver");
   }
 
   return (
-    <Modal title="Reassign driver" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Driver" hint="The previous assignment (if any) is closed out, not deleted — full history is preserved.">
-          <Select required value={driverId} onChange={(e) => setDriverId(e.target.value)}>
-            <option value="">Select a driver…</option>
-            {drivers?.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.fullName}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Assign
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal title="Reassign driver" onClose={onClose} onSubmit={handleSubmit} error={error} isSubmitting={isSubmitting} submitLabel="Assign">
+      <Field label="Driver" hint="The previous assignment (if any) is closed out, not deleted — full history is preserved.">
+        <Select required value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+          <option value="">Select a driver…</option>
+          {drivers?.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.fullName}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </FormModal>
   );
 }
 
@@ -383,46 +367,29 @@ function ReassignTrailerModal({
 }) {
   const { data: trailers } = useApi(() => trailersApi.list(companyId, "ACTIVE"), [companyId]);
   const [trailerId, setTrailerId] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: AssignTrailerInput) => trailerAssignmentsApi.assign(companyId, input),
+    onDone
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await trailerAssignmentsApi.assign(companyId, { vehicleId, trailerId });
-      onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reassign trailer");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ vehicleId, trailerId }, "Failed to reassign trailer");
   }
 
   return (
-    <Modal title="Reassign trailer" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Trailer">
-          <Select required value={trailerId} onChange={(e) => setTrailerId(e.target.value)}>
-            <option value="">Select a trailer…</option>
-            {trailers?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.plateNumber}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Assign
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal title="Reassign trailer" onClose={onClose} onSubmit={handleSubmit} error={error} isSubmitting={isSubmitting} submitLabel="Assign">
+      <Field label="Trailer">
+        <Select required value={trailerId} onChange={(e) => setTrailerId(e.target.value)}>
+          <option value="">Select a trailer…</option>
+          {trailers?.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.plateNumber}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </FormModal>
   );
 }

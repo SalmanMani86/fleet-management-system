@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useCompany } from "../context/useCompany";
-import { Modal } from "./Modal";
+import { useSubmit } from "../lib/useSubmit";
+import { FormModal } from "./FormModal";
 import { Field, Input } from "./Field";
-import { Button } from "./Button";
 import { companiesApi } from "../api/companies";
-import { ErrorBanner } from "./Feedback";
+import type { Company } from "../types";
 
 export function CompanySwitcher() {
   const { companies, currentCompany, selectCompany, refreshCompanies } = useCompany();
@@ -53,45 +53,29 @@ export function CompanySwitcher() {
 
 function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
   const [name, setName] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const { submit, isSubmitting, error } = useSubmit(
+    (input: { name: string }) => companiesApi.create(input),
+    (company: Company) => onCreated(company.id)
+  );
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const company = await companiesApi.create({ name });
-      onCreated(company.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create company");
-    } finally {
-      setIsSubmitting(false);
-    }
+    submit({ name }, "Failed to create company");
   }
 
   return (
-    <Modal title="Create company" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <ErrorBanner message={error} />}
-        <Field label="Company name">
-          <Input
-            autoFocus
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Demo Transport Co."
-          />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            Create company
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <FormModal
+      title="Create company"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      error={error}
+      isSubmitting={isSubmitting}
+      submitLabel="Create company"
+    >
+      <Field label="Company name">
+        <Input autoFocus required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Demo Transport Co." />
+      </Field>
+    </FormModal>
   );
 }
