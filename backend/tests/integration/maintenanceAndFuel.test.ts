@@ -70,7 +70,13 @@ describe("integration: maintenance status audit trail and fuel/trip driver consi
 
   it("derives and locks a fuel record's driverId from its linked trip, ignoring a contradicting client value", async () => {
     await assignDriverToVehicle(companyId, { vehicleId, driverId: driverAId });
-    const trip = await createTrip(companyId, { vehicleId, customerId, amount: 200 });
+    const trip = await createTrip(companyId, {
+      vehicleId,
+      customerId,
+      loadingPoint: "Riyadh",
+      deliveryPoint: "Jeddah",
+      amount: 200,
+    });
     expect(trip.driverId).toBe(driverAId);
 
     // Client attempts to claim Driver B fueled the vehicle for this trip —

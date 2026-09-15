@@ -43,7 +43,13 @@ describe("integration: assessment brief scenario — vehicle assigned to Driver 
   let tripId: string;
 
   it("creates a trip that snapshots Driver A as the resolved driver", async () => {
-    const trip = await createTrip(companyId, { vehicleId, customerId, amount: 500 });
+    const trip = await createTrip(companyId, {
+      vehicleId,
+      customerId,
+      loadingPoint: "Riyadh",
+      deliveryPoint: "Jeddah",
+      amount: 500,
+    });
     tripId = trip.id;
     expect(trip.driverId).toBe(driverAId);
     expect(trip.status).toBe("PLANNED");
@@ -78,19 +84,31 @@ describe("integration: assessment brief scenario — vehicle assigned to Driver 
   });
 
   it("rejects creating a trip amount of zero or negative before completion", async () => {
-    const trip = await createTrip(companyId, { vehicleId, customerId });
+    const trip = await createTrip(companyId, {
+      vehicleId,
+      customerId,
+      loadingPoint: "Riyadh",
+      deliveryPoint: "Jeddah",
+    });
     await expect(setTripAmount(companyId, trip.id, 0)).rejects.toThrow(/greater than zero/);
   });
 
   it("rejects completing a trip that has no positive amount set", async () => {
-    const trip = await createTrip(companyId, { vehicleId, customerId });
+    const trip = await createTrip(companyId, {
+      vehicleId,
+      customerId,
+      loadingPoint: "Riyadh",
+      deliveryPoint: "Jeddah",
+    });
     await transitionTripStatus(companyId, trip.id, "IN_PROGRESS");
     await expect(transitionTripStatus(companyId, trip.id, "COMPLETED")).rejects.toThrow(/positive amount/);
   });
 
   it("rejects trip creation for an INACTIVE vehicle", async () => {
     await setVehicleStatus(companyId, vehicleId, "INACTIVE");
-    await expect(createTrip(companyId, { vehicleId, customerId, amount: 100 })).rejects.toThrow(InvalidStateError);
+    await expect(
+      createTrip(companyId, { vehicleId, customerId, loadingPoint: "Riyadh", deliveryPoint: "Jeddah", amount: 100 })
+    ).rejects.toThrow(InvalidStateError);
     await setVehicleStatus(companyId, vehicleId, "ACTIVE");
   });
 });

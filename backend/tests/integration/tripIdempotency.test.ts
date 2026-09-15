@@ -25,11 +25,25 @@ describe("integration: trip idempotency prevents duplicate processing", () => {
   it("rejects a second trip creation with the same idempotency key", async () => {
     const key = `idem-trip-${Date.now()}`;
 
-    const first = await createTrip(companyId, { vehicleId, customerId, amount: 300, idempotencyKey: key });
+    const first = await createTrip(companyId, {
+      vehicleId,
+      customerId,
+      loadingPoint: "Riyadh",
+      deliveryPoint: "Jeddah",
+      amount: 300,
+      idempotencyKey: key,
+    });
     expect(first.idempotencyKey).toBe(key);
 
     await expect(
-      createTrip(companyId, { vehicleId, customerId, amount: 999, idempotencyKey: key })
+      createTrip(companyId, {
+        vehicleId,
+        customerId,
+        loadingPoint: "Riyadh",
+        deliveryPoint: "Jeddah",
+        amount: 999,
+        idempotencyKey: key,
+      })
     ).rejects.toThrow(/already been processed/);
 
     const trips = await prisma.trip.findMany({ where: { companyId, idempotencyKey: key } });

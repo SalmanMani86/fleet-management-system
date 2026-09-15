@@ -135,8 +135,8 @@ function CreateTripModal({
       await tripsApi.create(companyId, {
         vehicleId,
         customerId,
-        loadingPoint: loadingPoint || undefined,
-        deliveryPoint: deliveryPoint || undefined,
+        loadingPoint,
+        deliveryPoint,
         amount: amount || undefined,
       });
       onCreated();
@@ -191,11 +191,11 @@ function CreateTripModal({
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Loading point (optional)">
-            <Input value={loadingPoint} onChange={(e) => setLoadingPoint(e.target.value)} />
+          <Field label="Loading point">
+            <Input required value={loadingPoint} onChange={(e) => setLoadingPoint(e.target.value)} />
           </Field>
-          <Field label="Delivery point (optional)">
-            <Input value={deliveryPoint} onChange={(e) => setDeliveryPoint(e.target.value)} />
+          <Field label="Delivery point">
+            <Input required value={deliveryPoint} onChange={(e) => setDeliveryPoint(e.target.value)} />
           </Field>
         </div>
         <Field label="Amount (optional, required before completion)">

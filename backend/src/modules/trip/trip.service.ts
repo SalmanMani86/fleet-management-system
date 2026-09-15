@@ -9,8 +9,8 @@ import { assertValidTripTransition, InvalidTripTransitionError, TripStatus } fro
 export interface CreateTripInput {
   vehicleId: string;
   customerId: string;
-  loadingPoint?: string;
-  deliveryPoint?: string;
+  loadingPoint: string;
+  deliveryPoint: string;
   scheduledAt?: string;
   amount?: string | number;
   idempotencyKey?: string;

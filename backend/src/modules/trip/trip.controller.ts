@@ -6,8 +6,8 @@ import { NotFoundError } from "../../lib/errors";
 const CreateTripSchema = z.object({
   vehicleId: z.string().uuid(),
   customerId: z.string().uuid(),
-  loadingPoint: z.string().optional(),
-  deliveryPoint: z.string().optional(),
+  loadingPoint: z.string().min(1),
+  deliveryPoint: z.string().min(1),
   scheduledAt: z.string().optional(),
   amount: z.union([z.string(), z.number()]).optional(),
 });

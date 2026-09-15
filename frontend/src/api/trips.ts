@@ -10,8 +10,8 @@ export const tripsApi = {
     input: {
       vehicleId: string;
       customerId: string;
-      loadingPoint?: string;
-      deliveryPoint?: string;
+      loadingPoint: string;
+      deliveryPoint: string;
       scheduledAt?: string;
       amount?: string | number;
     }
