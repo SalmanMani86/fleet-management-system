@@ -21,11 +21,27 @@ const NEXT_STATUS: Partial<Record<TripStatus, TripStatus[]>> = {
   IN_PROGRESS: ["COMPLETED", "CANCELLED"],
 };
 
+const STATUS_FILTERS: { label: string; value: "OPEN" | TripStatus | "ALL" }[] = [
+  { label: "Open (planned/in progress)", value: "OPEN" },
+  { label: "All", value: "ALL" },
+  { label: "Planned", value: "PLANNED" },
+  { label: "In progress", value: "IN_PROGRESS" },
+  { label: "Completed", value: "COMPLETED" },
+  { label: "Cancelled", value: "CANCELLED" },
+];
+
 export function TripsPage() {
   const { currentCompany } = useCompany();
   const companyId = currentCompany!.id;
   const { data: trips, isLoading, error, reload } = useApi(() => tripsApi.list(companyId), [companyId]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"OPEN" | TripStatus | "ALL">("OPEN");
+
+  const filteredTrips = trips?.filter((t) => {
+    if (statusFilter === "ALL") return true;
+    if (statusFilter === "OPEN") return t.status === "PLANNED" || t.status === "IN_PROGRESS";
+    return t.status === statusFilter;
+  });
 
   async function transition(trip: Trip, status: TripStatus) {
     try {
@@ -41,19 +57,37 @@ export function TripsPage() {
       <PageHeader
         title="Trips"
         description="Driver and trailer are resolved automatically from the vehicle's current assignment at creation time, and stay fixed even if the vehicle is later reassigned."
-        actions={<Button onClick={() => setIsCreateOpen(true)}>New trip</Button>}
+        actions={
+          <>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              className="w-auto"
+            >
+              {STATUS_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </Select>
+            <Button onClick={() => setIsCreateOpen(true)}>New trip</Button>
+          </>
+        }
       />
 
       {isLoading ? (
         <FullPageSpinner />
       ) : error ? (
         <ErrorBanner message={error} />
-      ) : !trips || trips.length === 0 ? (
-        <EmptyState title="No trips yet" />
+      ) : !filteredTrips || filteredTrips.length === 0 ? (
+        <EmptyState
+          title={trips && trips.length > 0 ? "No trips match this filter" : "No trips yet"}
+        />
       ) : (
         <Table>
           <THead>
             <tr>
+              <TH>Route</TH>
               <TH>Customer</TH>
               <TH>Driver</TH>
               <TH>Trailer</TH>
@@ -64,8 +98,11 @@ export function TripsPage() {
             </tr>
           </THead>
           <TBody>
-            {trips.map((t) => (
+            {filteredTrips.map((t) => (
               <TR key={t.id}>
+                <TD className="text-slate-500">
+                  {t.loadingPoint || t.deliveryPoint ? `${t.loadingPoint ?? "?"} → ${t.deliveryPoint ?? "?"}` : "—"}
+                </TD>
                 <TD>{t.customer?.name ?? "—"}</TD>
                 <TD className="font-medium text-slate-900">{t.driver?.fullName ?? "—"}</TD>
                 <TD>{t.trailer?.plateNumber ?? "—"}</TD>

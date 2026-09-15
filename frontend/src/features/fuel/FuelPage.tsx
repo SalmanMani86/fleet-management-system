@@ -116,7 +116,17 @@ function CreateFuelRecordModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const vehicleTrips = trips?.filter((t) => t.vehicleId === vehicleId) ?? [];
+  // Only trips still in flight make sense to link a fuel purchase to — a
+  // COMPLETED or CANCELLED trip is closed history, not something new fuel
+  // usage should attach to.
+  const vehicleTrips =
+    trips?.filter((t) => t.vehicleId === vehicleId && (t.status === "PLANNED" || t.status === "IN_PROGRESS")) ?? [];
+
+  function tripLabel(t: Trip): string {
+    const route = [t.loadingPoint, t.deliveryPoint].filter(Boolean).join(" → ") || "No route set";
+    const amount = t.amount ? formatMoney(t.amount) : "no amount";
+    return `${route} · ${amount} · ${t.status.replace("_", " ")} · ${formatDateTime(t.createdAt)}`;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -160,12 +170,19 @@ function CreateFuelRecordModal({
             ))}
           </Select>
         </Field>
-        <Field label="Linked trip (optional)" hint="If set, the driver is taken from the trip automatically.">
+        <Field
+          label="Linked trip (optional)"
+          hint={
+            vehicleId && vehicleTrips.length === 0
+              ? "No open (planned/in-progress) trips for this vehicle to link to."
+              : "If set, the driver is taken from the trip automatically. Only open trips are shown."
+          }
+        >
           <Select value={tripId} onChange={(e) => setTripId(e.target.value)} disabled={!vehicleId}>
             <option value="">No linked trip</option>
             {vehicleTrips.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.customer?.name ?? t.id} — {t.driver?.fullName}
+                {tripLabel(t)}
               </option>
             ))}
           </Select>
