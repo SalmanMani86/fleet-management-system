@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
 import { vehiclesApi } from "../../api/vehicles";
 import { vehicleModelsApi } from "../../api/vehicleModels";
+import { vehicleAssignmentsApi } from "../../api/vehicleAssignments";
 import { PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/Button";
 import { Table, THead, TH, TBody, TR, TD } from "../../components/Table";
 import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedback";
-import { StatusBadge } from "../../components/Badge";
+import { StatusBadge, Badge } from "../../components/Badge";
 import { Modal } from "../../components/Modal";
 import { Field, Input, Select } from "../../components/Field";
 
@@ -18,6 +19,27 @@ export function VehiclesPage() {
   const navigate = useNavigate();
   const { data: vehicles, isLoading, error, reload } = useApi(() => vehiclesApi.list(companyId), [companyId]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [driverNameByVehicleId, setDriverNameByVehicleId] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    if (!vehicles || vehicles.length === 0) return;
+    let cancelled = false;
+
+    Promise.all(
+      vehicles.map((v) =>
+        vehicleAssignmentsApi
+          .getCurrent(companyId, v.id)
+          .then((assignment) => [v.id, assignment?.driver?.fullName ?? null] as const)
+      )
+    ).then((entries) => {
+      if (cancelled) return;
+      setDriverNameByVehicleId(Object.fromEntries(entries));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, vehicles]);
 
   return (
     <div>
@@ -41,21 +63,34 @@ export function VehiclesPage() {
               <TH>VIN</TH>
               <TH>Model</TH>
               <TH align="right">Year</TH>
+              <TH>Driver</TH>
               <TH>Status</TH>
             </tr>
           </THead>
           <TBody>
-            {vehicles.map((v) => (
-              <TR key={v.id} onClick={() => navigate(`/vehicles/${v.id}`)}>
-                <TD className="font-medium text-slate-900">{v.plateNumber}</TD>
-                <TD className="text-slate-500">{v.vin}</TD>
-                <TD>{v.vehicleModel ? `${v.vehicleModel.make} ${v.vehicleModel.modelName}` : "—"}</TD>
-                <TD align="right">{v.manufactureYear}</TD>
-                <TD>
-                  <StatusBadge status={v.status} />
-                </TD>
-              </TR>
-            ))}
+            {vehicles.map((v) => {
+              const driverName = driverNameByVehicleId[v.id];
+              return (
+                <TR key={v.id} onClick={() => navigate(`/vehicles/${v.id}`)}>
+                  <TD className="font-medium text-slate-900">{v.plateNumber}</TD>
+                  <TD className="text-slate-500">{v.vin}</TD>
+                  <TD>{v.vehicleModel ? `${v.vehicleModel.make} ${v.vehicleModel.modelName}` : "—"}</TD>
+                  <TD align="right">{v.manufactureYear}</TD>
+                  <TD>
+                    {driverName === undefined ? (
+                      "…"
+                    ) : driverName ? (
+                      driverName
+                    ) : (
+                      <Badge tone="amber">No driver assigned</Badge>
+                    )}
+                  </TD>
+                  <TD>
+                    <StatusBadge status={v.status} />
+                  </TD>
+                </TR>
+              );
+            })}
           </TBody>
         </Table>
       )}

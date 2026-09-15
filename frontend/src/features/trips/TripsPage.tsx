@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useCompany } from "../../context/useCompany";
 import { useApi } from "../../lib/useApi";
 import { tripsApi } from "../../api/trips";
@@ -168,7 +169,13 @@ function CreateTripModal({
                 Driver will be resolved automatically: <span className="font-medium text-slate-900">{currentAssignment.driver?.fullName}</span>
               </span>
             ) : (
-              <span className="text-rose-600">This vehicle has no current driver assignment — assign a driver first.</span>
+              <span className="text-rose-600">
+                This vehicle has no current driver assignment.{" "}
+                <Link to={`/vehicles/${vehicleId}`} target="_blank" rel="noopener noreferrer" className="font-medium underline">
+                  Open its profile to assign a driver
+                </Link>
+                , then come back and select it again.
+              </span>
             )}
           </div>
         )}
