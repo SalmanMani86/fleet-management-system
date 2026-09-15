@@ -12,6 +12,7 @@ import { FullPageSpinner, ErrorBanner, EmptyState } from "../../components/Feedb
 import { Modal } from "../../components/Modal";
 import { Field, Input, Select } from "../../components/Field";
 import { formatDateTime, formatMoney } from "../../lib/format";
+import type { Driver, Trip, Vehicle } from "../../types";
 
 export function FuelPage() {
   const { currentCompany } = useCompany();
@@ -19,6 +20,7 @@ export function FuelPage() {
   const { data: records, isLoading, error, reload } = useApi(() => fuelApi.list(companyId), [companyId]);
   const { data: vehicles } = useApi(() => vehiclesApi.list(companyId), [companyId]);
   const { data: drivers } = useApi(() => driversApi.list(companyId), [companyId]);
+  const { data: trips } = useApi(() => tripsApi.list(companyId), [companyId]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   function plateFor(vehicleId: string) {
@@ -76,6 +78,9 @@ export function FuelPage() {
       {isCreateOpen && (
         <CreateFuelRecordModal
           companyId={companyId}
+          vehicles={vehicles ?? []}
+          drivers={drivers ?? []}
+          trips={trips ?? []}
           onClose={() => setIsCreateOpen(false)}
           onCreated={() => {
             setIsCreateOpen(false);
@@ -89,16 +94,19 @@ export function FuelPage() {
 
 function CreateFuelRecordModal({
   companyId,
+  vehicles,
+  drivers,
+  trips,
   onClose,
   onCreated,
 }: {
   companyId: string;
+  vehicles: Vehicle[];
+  drivers: Driver[];
+  trips: Trip[];
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { data: vehicles } = useApi(() => vehiclesApi.list(companyId), [companyId]);
-  const { data: drivers } = useApi(() => driversApi.list(companyId), [companyId]);
-  const { data: trips } = useApi(() => tripsApi.list(companyId), [companyId]);
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const [tripId, setTripId] = useState("");

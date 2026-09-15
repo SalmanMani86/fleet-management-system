@@ -11,7 +11,7 @@ import { StatusBadge } from "../../components/Badge";
 import { Modal } from "../../components/Modal";
 import { Field, Input, Select } from "../../components/Field";
 import { formatDate, formatMoney } from "../../lib/format";
-import type { MaintenanceRecord, MaintenanceStatus } from "../../types";
+import type { MaintenanceRecord, MaintenanceStatus, Vehicle } from "../../types";
 
 const NEXT_STATUS: Partial<Record<MaintenanceStatus, MaintenanceStatus[]>> = {
   SCHEDULED: ["IN_PROGRESS", "CANCELLED"],
@@ -92,6 +92,7 @@ export function MaintenancePage() {
       {isCreateOpen && (
         <CreateMaintenanceModal
           companyId={companyId}
+          vehicles={vehicles ?? []}
           onClose={() => setIsCreateOpen(false)}
           onCreated={() => {
             setIsCreateOpen(false);
@@ -105,14 +106,15 @@ export function MaintenancePage() {
 
 function CreateMaintenanceModal({
   companyId,
+  vehicles,
   onClose,
   onCreated,
 }: {
   companyId: string;
+  vehicles: Vehicle[];
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { data: vehicles } = useApi(() => vehiclesApi.list(companyId), [companyId]);
   const [vehicleId, setVehicleId] = useState("");
   const [description, setDescription] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");

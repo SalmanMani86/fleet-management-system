@@ -11,7 +11,7 @@ import { Badge } from "../../components/Badge";
 import { Modal } from "../../components/Modal";
 import { Field, Input, Select } from "../../components/Field";
 import { formatDate, daysUntil } from "../../lib/format";
-import type { DocumentType } from "../../types";
+import type { DocumentType, Vehicle } from "../../types";
 
 const DOCUMENT_TYPES: DocumentType[] = ["REGISTRATION", "INSURANCE", "INSPECTION", "PERMIT", "OTHER"];
 
@@ -76,6 +76,7 @@ export function DocumentsPage() {
       {isCreateOpen && (
         <CreateDocumentModal
           companyId={companyId}
+          vehicles={vehicles ?? []}
           onClose={() => setIsCreateOpen(false)}
           onCreated={() => {
             setIsCreateOpen(false);
@@ -89,14 +90,15 @@ export function DocumentsPage() {
 
 function CreateDocumentModal({
   companyId,
+  vehicles,
   onClose,
   onCreated,
 }: {
   companyId: string;
+  vehicles: Vehicle[];
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { data: vehicles } = useApi(() => vehiclesApi.list(companyId), [companyId]);
   const [vehicleId, setVehicleId] = useState("");
   const [documentType, setDocumentType] = useState<DocumentType>("REGISTRATION");
   const [documentNumber, setDocumentNumber] = useState("");
